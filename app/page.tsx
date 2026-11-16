@@ -128,6 +128,15 @@ export default function Home(){
     if(!error){setReason("");await refresh(user);}
     setBusy(false);
   }
+  async function cancelEvent(p:Proposal){
+    if(!client||!user)return;
+    if(!reason.trim()){setMessage("Enter a cancellation reason first.");return;}
+    setBusy(true);
+    const {error}=await client.rpc("cmc_cancel_event",{p_id:p.id,p_reason:reason});
+    setMessage(error?.message||"Event cancelled. Registered students must be notified separately; automatic notifications are not yet configured.");
+    if(!error){setReason("");await refresh(user);}
+    setBusy(false);
+  }
   async function register(p:Proposal){
     if(!client||!user)return;setBusy(true);
     const {error}=registered.includes(p.id)
@@ -172,10 +181,11 @@ export default function Home(){
         </form><h3>Your club proposals</h3>
         {mine.length===0?<p>No proposals yet.</p>:mine.map(p=><p key={p.id}><strong>{p.title}</strong> — {p.status} · {dateLabel(p.starts_at)} {(p.status==="changes_requested"||p.status==="approved")&&<button type="button" className="secondary" disabled={p.status==="approved"&&changes.some(c=>c.proposal_id===p.id&&c.status==="pending_src_review")} onClick={()=>loadRevision(p)}>{p.status==="approved"?"Request event change":"Revise"}</button>}</p>)}
       </section>}
+      {src&&<section className="panel"><h2>Cancel an approved event</h2><p>Cancellations are recorded for audit. Email and calendar notifications are not automated yet.</p>{approved.map(p=><div className="actions" key={p.id}><strong>{p.title}</strong><button className="secondary" disabled={busy} onClick={()=>void cancelEvent(p)}>Cancel event</button></div>)}</section>}
       {src&&<section className="panel"><h2>Changes to approved events</h2><p>Approved details remain live until SRC accepts the replacement.</p>{changes.filter(c=>c.status==="pending_src_review").length===0?<p>No pending changes.</p>:changes.filter(c=>c.status==="pending_src_review").map(c=><article className="tile" key={c.id}><h3>{c.title}</h3><p>{c.venue} · {dateLabel(c.starts_at)} – {dateLabel(c.ends_at)} · Capacity {c.capacity??"Unlimited"}</p><div className="actions"><button disabled={busy} onClick={()=>void reviewChange(c,true)}>Approve changes</button><button disabled={busy} className="secondary" onClick={()=>void reviewChange(c,false)}>Reject changes</button></div></article>)}</section>}
       {src&&<section className="panel"><h2>SRC approval dashboard</h2>
         <p>Only active SRC officers may record decisions. Approvals are checked again in the database.</p>
-        <label>Reason for rejection / revision request<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Required unless approving"/></label>
+        <label>Reason for rejection, revision or cancellation<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Required unless approving"/></label>
         {pending.length===0?<p>No pending proposals.</p>:pending.map(p=><article className="tile" key={p.id}>
           <h3>{p.title}</h3><p>{p.description}</p><p>{dateLabel(p.starts_at)} – {dateLabel(p.ends_at)} · {p.venue}</p>
           <div className="actions"><button disabled={busy} onClick={()=>void review(p,"approved")}>Approve</button>
