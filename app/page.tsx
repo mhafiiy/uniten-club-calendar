@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
-type Proposal = { id:string; club_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; status:string; submitted_by:string };
+type Proposal = { id:string; club_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; status:string; submitted_by:string; capacity:number|null };
 type Club = { id:string; name:string };
 type Membership = { club_id:string };
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,6 +35,7 @@ export default function Home(){
   const [starts,setStarts]=useState("");
   const [ends,setEnds]=useState("");
   const [reason,setReason]=useState("");
+  const [capacity,setCapacity]=useState("");
   async function refresh(u:User|null) {
     if(!client||!u){setClubs([]);setMembership([]);setSrc(false);setProposals([]);setRegistered([]);return;}
     const [c,m,s,p,r]=await Promise.all([
@@ -80,7 +81,7 @@ export default function Home(){
     if(!clubId||!starts||!ends||new Date(ends+"+08:00")<=new Date(starts+"+08:00")){setMessage("Choose a club and valid start/end times.");return;}
     setBusy(true);
     const values={club_id:clubId,submitted_by:user.id,title,description,venue,
-      starts_at:new Date(starts+"+08:00").toISOString(),ends_at:new Date(ends+"+08:00").toISOString()};
+      starts_at:new Date(starts+"+08:00").toISOString(),ends_at:new Date(ends+"+08:00").toISOString(),capacity:capacity?Number(capacity):null};
     const result=editingId
       ?await client.from("cmc_event_proposals").update(values).eq("id",editingId).select("id").single()
       :await client.from("cmc_event_proposals").insert({...values,status:"draft"}).select("id").single();
@@ -88,7 +89,7 @@ export default function Home(){
     else {
       const submission=await client.rpc("cmc_submit_proposal",{p_id:result.data.id});
       setMessage(submission.error?.message||"Proposal submitted for SRC approval.");
-      if(!submission.error){setEditingId(null);setTitle("");setDescription("");setVenue("");setStarts("");setEnds("");}
+      if(!submission.error){setEditingId(null);setTitle("");setDescription("");setVenue("");setStarts("");setEnds("");setCapacity("");}
       await refresh(user);
     }
     setBusy(false);
@@ -96,7 +97,7 @@ export default function Home(){
   function loadRevision(p:Proposal){
     setEditingId(p.id);setClubId(p.club_id);setTitle(p.title);setDescription(p.description||"");setVenue(p.venue);
     const fmt=(v:string)=>new Intl.DateTimeFormat("sv-SE",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(new Date(v)).replace(" ","T");
-    setStarts(fmt(p.starts_at));setEnds(fmt(p.ends_at));setMessage("Loaded proposal for revision. Update the fields and resubmit for SRC review.");
+    setStarts(fmt(p.starts_at));setEnds(fmt(p.ends_at));setCapacity(p.capacity===null?"":String(p.capacity));setMessage("Loaded proposal for revision. Update the fields and resubmit for SRC review.");
   }
   async function review(p:Proposal,decision:string){
     if(!client||!user)return;
@@ -111,7 +112,7 @@ export default function Home(){
     if(!client||!user)return;setBusy(true);
     const {error}=registered.includes(p.id)
       ?await client.from("cmc_registrations").delete().eq("proposal_id",p.id).eq("user_id",user.id)
-      :await client.from("cmc_registrations").insert({proposal_id:p.id,user_id:user.id});
+      :await client.rpc("cmc_register_event",{p_id:p.id});
     setMessage(error?.message||(registered.includes(p.id)?"Registration cancelled. Remove any manually saved calendar entry.":"Registration confirmed. You can add the event to Google Calendar."));
     await refresh(user);setBusy(false);
   }
@@ -132,7 +133,7 @@ export default function Home(){
       <div className="actions"><span>Signed in as <strong>{user.email}</strong></span><button className="secondary" onClick={()=>void client.auth.signOut()}>Sign out</button><button className="secondary" onClick={()=>void refresh(user)}>Refresh</button></div>
       <section className="panel"><h2>Approved events</h2>
         {approved.length===0?<p>No approved events are available yet.</p>:<div className="grid">{approved.map(p=><article className="tile" key={p.id}>
-          <h3>{p.title}</h3><p>{p.description}</p><p><strong>{dateLabel(p.starts_at)}</strong> – {dateLabel(p.ends_at)}</p><p>Venue: {p.venue}</p>
+          <h3>{p.title}</h3><p>{p.description}</p><p><strong>{dateLabel(p.starts_at)}</strong> – {dateLabel(p.ends_at)}</p><p>Venue: {p.venue}</p><p>Capacity: {p.capacity??"Unlimited"}</p>
           <div className="actions"><button disabled={busy} onClick={()=>void register(p)}>{registered.includes(p.id)?"Cancel registration":"Register"}</button>
           {registered.includes(p.id)&&<a href={googleLink(p)} target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>}</div>
         </article>)}</div>}
@@ -144,6 +145,7 @@ export default function Home(){
           <label>Event title<input required minLength={3} maxLength={200} value={title} onChange={e=>setTitle(e.target.value)}/></label>
           <label>Description<textarea value={description} onChange={e=>setDescription(e.target.value)}/></label>
           <label>Venue<input required value={venue} onChange={e=>setVenue(e.target.value)}/></label>
+          <label>Capacity (optional)<input type="number" min="1" step="1" value={capacity} onChange={e=>setCapacity(e.target.value)} placeholder="Unlimited if blank"/></label>
           <label>Start (Malaysia time)<input required type="datetime-local" value={starts} onChange={e=>setStarts(e.target.value)}/></label>
           <label>End (Malaysia time)<input required type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/></label>
           <button disabled={busy}>{editingId?"Save changes and resubmit":"Submit for SRC approval"}</button>
