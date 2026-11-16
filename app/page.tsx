@@ -27,6 +27,7 @@ export default function Home(){
   const [registered,setRegistered]=useState<string[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
+  const [editingId,setEditingId]=useState<string|null>(null);
   const [title,setTitle]=useState("");
   const [description,setDescription]=useState("");
   const [venue,setVenue]=useState("");
@@ -78,18 +79,24 @@ export default function Home(){
     e.preventDefault();if(!client||!user)return;
     if(!clubId||!starts||!ends||new Date(ends+"+08:00")<=new Date(starts+"+08:00")){setMessage("Choose a club and valid start/end times.");return;}
     setBusy(true);
-    const {data,error}=await client.from("cmc_event_proposals").insert({
-      club_id:clubId,submitted_by:user.id,title,description,venue,
-      starts_at:new Date(starts+"+08:00").toISOString(),ends_at:new Date(ends+"+08:00").toISOString(),status:"draft"
-    }).select("id").single();
-    if(error)setMessage(error.message);
+    const values={club_id:clubId,submitted_by:user.id,title,description,venue,
+      starts_at:new Date(starts+"+08:00").toISOString(),ends_at:new Date(ends+"+08:00").toISOString()};
+    const result=editingId
+      ?await client.from("cmc_event_proposals").update(values).eq("id",editingId).select("id").single()
+      :await client.from("cmc_event_proposals").insert({...values,status:"draft"}).select("id").single();
+    if(result.error)setMessage(result.error.message);
     else {
-      const result=await client.rpc("cmc_submit_proposal",{p_id:data.id});
-      setMessage(result.error?.message||"Proposal submitted for SRC approval.");
-      if(!result.error){setTitle("");setDescription("");setVenue("");setStarts("");setEnds("");}
+      const submission=await client.rpc("cmc_submit_proposal",{p_id:result.data.id});
+      setMessage(submission.error?.message||"Proposal submitted for SRC approval.");
+      if(!submission.error){setEditingId(null);setTitle("");setDescription("");setVenue("");setStarts("");setEnds("");}
       await refresh(user);
     }
     setBusy(false);
+  }
+  function loadRevision(p:Proposal){
+    setEditingId(p.id);setClubId(p.club_id);setTitle(p.title);setDescription(p.description||"");setVenue(p.venue);
+    const fmt=(v:string)=>new Intl.DateTimeFormat("sv-SE",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(new Date(v)).replace(" ","T");
+    setStarts(fmt(p.starts_at));setEnds(fmt(p.ends_at));setMessage("Loaded proposal for revision. Update the fields and resubmit for SRC review.");
   }
   async function review(p:Proposal,decision:string){
     if(!client||!user)return;
@@ -139,9 +146,9 @@ export default function Home(){
           <label>Venue<input required value={venue} onChange={e=>setVenue(e.target.value)}/></label>
           <label>Start (Malaysia time)<input required type="datetime-local" value={starts} onChange={e=>setStarts(e.target.value)}/></label>
           <label>End (Malaysia time)<input required type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/></label>
-          <button disabled={busy}>Submit for SRC approval</button>
+          <button disabled={busy}>{editingId?"Save changes and resubmit":"Submit for SRC approval"}</button>
         </form><h3>Your club proposals</h3>
-        {mine.length===0?<p>No proposals yet.</p>:mine.map(p=><p key={p.id}><strong>{p.title}</strong> — {p.status} · {dateLabel(p.starts_at)}</p>)}
+        {mine.length===0?<p>No proposals yet.</p>:mine.map(p=><p key={p.id}><strong>{p.title}</strong> — {p.status} · {dateLabel(p.starts_at)} {p.status==="changes_requested"&&<button type="button" className="secondary" onClick={()=>loadRevision(p)}>Revise</button>}</p>)}
       </section>}
       {src&&<section className="panel"><h2>SRC approval dashboard</h2>
         <p>Only active SRC officers may record decisions. Approvals are checked again in the database.</p>
