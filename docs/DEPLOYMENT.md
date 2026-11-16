@@ -13,6 +13,9 @@ Application and database foundations exist, but the production build, authentica
 5. Configure Supabase Auth URL settings for the exact Vercel preview and production URLs, including any required callback paths.
 6. Confirm the GitHub Actions build is green and the preview passes manual tests.
 
+## Latest CI
+The earlier Next.js build passed. Re-run and verify CI on the latest commit before deploying; later feature commits are not covered by the earlier successful build.
+
 ## Test matrix
 - Student signup/login/logout and confirmation email, if enabled.
 - Unauthenticated visitors cannot read private proposals or registration records.
@@ -32,9 +35,9 @@ Application and database foundations exist, but the production build, authentica
 Only authorised administrators should provision membership rows in `cmc_club_memberships` and `cmc_src_memberships` after verifying real identities. Do not create SRC roles through self-signup or public API policies.
 
 ## Important limitations
-- No capacity limit or waitlist is implemented.
-- No edit-and-resubmit interface yet for `changes_requested` proposals.
-- No cancellation or material-change reapproval workflow yet for approved events.
+- Atomic capacity-limited registration is implemented; waitlists are not implemented.
+- Edit-and-resubmit for `changes_requested` proposals is implemented, but requires authenticated integration testing.
+- SRC review for material changes and SRC event cancellation are implemented. **Notifications to registered students and automatic Google Calendar updates are not yet implemented.**
 - No automatic Google Calendar sync or default reminder enforcement yet.
 - Legacy `club_events` and new `cmc_event_proposals` are separate; do not migrate or publish legacy events without SRC verification.
 - The development branch has no verified dependency lockfile. Generate and commit one after installing dependencies in a network-enabled environment.
