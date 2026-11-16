@@ -26,6 +26,8 @@ The earlier Next.js build passed. Re-run and verify CI on the latest commit befo
 - SRC approval fails when the proposed venue overlaps another approved event.
 - Only approved proposals appear on the student calendar.
 - Student can register once and cancel their own registration.
+- Approved event changes and cancellations create in-app notifications for registered students; users can mark notifications read.
+- Attempted direct edits to immutable proposal identity fields are rejected by the database trigger.
 - A non-SRC user cannot invoke `cmc_review_proposal` successfully.
 - Event times display correctly in Malaysia time (UTC+8).
 - Google Calendar manual link opens with correct event details. Manual links do not enforce reminders.
@@ -37,7 +39,7 @@ Only authorised administrators should provision membership rows in `cmc_club_mem
 ## Important limitations
 - Atomic capacity-limited registration is implemented; waitlists are not implemented.
 - Edit-and-resubmit for `changes_requested` proposals is implemented, but requires authenticated integration testing.
-- SRC review for material changes and SRC event cancellation are implemented. **Notifications to registered students and automatic Google Calendar updates are not yet implemented.**
+- SRC review for material changes and SRC event cancellation are implemented. **In-app notifications for registered students are implemented; email delivery and automatic Google Calendar updates are not yet implemented.**
 - No automatic Google Calendar sync or default reminder enforcement yet.
 - Legacy `club_events` and new `cmc_event_proposals` are separate; do not migrate or publish legacy events without SRC verification.
 - The development branch has no verified dependency lockfile. Generate and commit one after installing dependencies in a network-enabled environment.
