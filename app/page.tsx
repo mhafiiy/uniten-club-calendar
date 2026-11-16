@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 type Proposal = { id:string; club_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; status:string; submitted_by:string };
@@ -61,7 +61,7 @@ export default function Home(){
     });
     return ()=>subscription.unsubscribe();
   },[]);
-  async function signIn(e:React.FormEvent){
+  async function signIn(e:FormEvent){
     e.preventDefault();if(!client)return;
     setBusy(true);setMessage("");
     const {error}=await client.auth.signInWithPassword({email,password});
@@ -74,13 +74,13 @@ export default function Home(){
     setMessage(error?.message||"Check your email to confirm your account, if confirmation is enabled.");
     setBusy(false);
   }
-  async function createProposal(e:React.FormEvent){
+  async function createProposal(e:FormEvent){
     e.preventDefault();if(!client||!user)return;
-    if(!clubId||!starts||!ends||new Date(ends)<=new Date(starts)){setMessage("Choose a club and valid start/end times.");return;}
+    if(!clubId||!starts||!ends||new Date(ends+"+08:00")<=new Date(starts+"+08:00")){setMessage("Choose a club and valid start/end times.");return;}
     setBusy(true);
     const {data,error}=await client.from("cmc_event_proposals").insert({
       club_id:clubId,submitted_by:user.id,title,description,venue,
-      starts_at:new Date(starts).toISOString(),ends_at:new Date(ends).toISOString(),status:"draft"
+      starts_at:new Date(starts+"+08:00").toISOString(),ends_at:new Date(ends+"+08:00").toISOString(),status:"draft"
     }).select("id").single();
     if(error)setMessage(error.message);
     else {
