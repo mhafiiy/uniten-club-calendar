@@ -1,18 +1,33 @@
 # UNITEN Club Master Calendar
 
-Centralised scheduling, SRC approval and student registration for UNITEN club events.
+UNITEN club scheduling with mandatory SRC approval, student event registration, and optional Google Calendar links.
 
-## Current status
-Architecture and Google Calendar requirements have been documented on the `feature/cmc-foundation` branch. The web application, Supabase schema, authentication, approval workflow and calendar integration are **not yet implemented**.
+## Implementation status (16 November 2026)
+The `feature/cmc-foundation` branch contains a Next.js/TypeScript application with:
+- Supabase email/password signup and login
+- Club representative event submission and requested-revision resubmission
+- SRC review dashboard (approve, reject, request changes)
+- Student-facing approved-event list and registration/cancellation
+- Manual Add to Google Calendar links
+- Database-enforced role checks, RLS, audit records and same-venue approval clash protection
+- GitHub Actions build workflow
 
-## Core requirements
-- Every club event requires explicit SRC approval before public publication or registration.
-- Conflict warnings for dates, audiences and venues.
-- Approved event calendar with event name, date/time and venue.
-- Student registration and optional Google Calendar integration.
-- Default reminders: 7 days, 24 hours and 1 hour before events.
+The Supabase schema changes were applied to the dedicated `uniten-club-calendar` project. The repository `main` branch is unchanged; see [draft PR #1](https://github.com/mhafiiy/uniten-club-calendar/pull/1).
 
-See [Architecture](docs/ARCHITECTURE.md) and [Google Calendar specification](docs/GOOGLE_CALENDAR.md).
+**Not production ready:** CI build result and authenticated integration tests have not been verified. Role provisioning, approved-event modification/reapproval, capacity limits, event cancellations, and automatic Google Calendar sync remain incomplete. Manual calendar links do not guarantee reminders.
 
-## Next steps
-Scaffold the application, provision Supabase tables/RLS, implement SRC approval and test all role boundaries before deployment.
+## Setup
+1. Run `npm install` using Node.js 22.
+2. Copy `.env.example` to `.env.local` and enter the active Supabase publishable key.
+3. Run `npm run dev`.
+4. In Supabase Auth settings, configure the permitted site and redirect URLs.
+5. Provision club representative and SRC memberships only after an administrator verifies identities.
+
+## Google Calendar reminder defaults (automatic sync — planned)
+7 days (10080 minutes), 24 hours (1440 minutes), and 1 hour (60 minutes) before the event. Students must explicitly authorise Google Calendar sync. Manual links cannot set these reminders automatically.
+
+## Documentation
+- [Architecture](docs/ARCHITECTURE.md)
+- [Calendar integration](docs/GOOGLE_CALENDAR.md)
+- [Applied database foundation](docs/DATABASE_IMPLEMENTATION.md)
+- [Deployment checklist](docs/DEPLOYMENT.md)
