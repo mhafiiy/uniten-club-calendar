@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 type Proposal = { id:string; club_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; status:string; submitted_by:string; capacity:number|null };
+type Notice = { id:string; proposal_id:string; event_type:string; created_at:string; read_at:string|null };
 type Change = { id:string; proposal_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; capacity:number|null; status:string };
 type Club = { id:string; name:string };
 type Membership = { club_id:string };
@@ -27,6 +28,7 @@ export default function Home(){
   const [proposals,setProposals]=useState<Proposal[]>([]);
   const [registered,setRegistered]=useState<string[]>([]);
   const [changes,setChanges]=useState<Change[]>([]);
+  const [notices,setNotices]=useState<Notice[]>([]);
   const [changeMode,setChangeMode]=useState(false);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -40,22 +42,24 @@ export default function Home(){
   const [reason,setReason]=useState("");
   const [capacity,setCapacity]=useState("");
   async function refresh(u:User|null) {
-    if(!client||!u){setClubs([]);setMembership([]);setSrc(false);setProposals([]);setRegistered([]);setChanges([]);return;}
-    const [c,m,s,p,r,ch]=await Promise.all([
+    if(!client||!u){setClubs([]);setMembership([]);setSrc(false);setProposals([]);setRegistered([]);setChanges([]);setNotices([]);return;}
+    const [c,m,s,p,r,ch,nt]=await Promise.all([
       client.from("clubs").select("id,name").order("name"),
       client.from("cmc_club_memberships").select("club_id").eq("user_id",u.id),
       client.from("cmc_src_memberships").select("active").eq("user_id",u.id).maybeSingle(),
       client.from("cmc_event_proposals").select("*").order("starts_at",{ascending:true}),
       client.from("cmc_registrations").select("proposal_id").eq("user_id",u.id),
-      client.from("cmc_event_change_requests").select("*").order("created_at",{ascending:false})
+      client.from("cmc_event_change_requests").select("*").order("created_at",{ascending:false}),
+      client.from("cmc_event_notifications").select("id,proposal_id,event_type,created_at,read_at").eq("user_id",u.id).order("created_at",{ascending:false}).limit(50)
     ]);
-    for(const result of [c,m,s,p,r,ch]) if(result.error) setMessage(result.error.message);
+    for(const result of [c,m,s,p,r,ch,nt]) if(result.error) setMessage(result.error.message);
     setClubs((c.data||[]) as Club[]);
     setMembership((m.data||[]) as Membership[]);
     setSrc(s.data?.active===true);
     setProposals((p.data||[]) as Proposal[]);
     setRegistered((r.data||[]).map(x=>x.proposal_id));
     setChanges((ch.data||[]) as Change[]);
+    setNotices((nt.data||[]) as Notice[]);
   }
   useEffect(()=>{
     if(!client)return;
@@ -128,6 +132,12 @@ export default function Home(){
     if(!error){setReason("");await refresh(user);}
     setBusy(false);
   }
+  async function acknowledge(id:string){
+    if(!client||!user)return;
+    const {error}=await client.from("cmc_event_notifications").update({read_at:new Date().toISOString()}).eq("id",id).eq("user_id",user.id);
+    setMessage(error?.message||"Notification marked as read.");
+    if(!error)await refresh(user);
+  }
   async function cancelEvent(p:Proposal){
     if(!client||!user)return;
     if(!reason.trim()){setMessage("Enter a cancellation reason first.");return;}
@@ -160,6 +170,7 @@ export default function Home(){
     </form><p>New accounts start as students. Club representative and SRC access must be assigned by an authorised administrator.</p></section>:
     <>
       <div className="actions"><span>Signed in as <strong>{user.email}</strong></span><button className="secondary" onClick={()=>void client.auth.signOut()}>Sign out</button><button className="secondary" onClick={()=>void refresh(user)}>Refresh</button></div>
+      {notices.some(n=>!n.read_at)&&<section className="panel"><h2>Event updates affecting your registrations</h2><p>These are in-app notifications. Email and Google Calendar updates are not automatic yet.</p>{notices.filter(n=>!n.read_at).map(n=><div className="tile" key={n.id}><strong>{n.event_type==="event_cancelled"?"Event cancelled":"Event details changed"}</strong><p>{proposals.find(p=>p.id===n.proposal_id)?.title||"A registered event"} · {dateLabel(n.created_at)}</p><button className="secondary" onClick={()=>void acknowledge(n.id)}>Mark as read</button></div>)}</section>}
       <section className="panel"><h2>Approved events</h2>
         {approved.length===0?<p>No approved events are available yet.</p>:<div className="grid">{approved.map(p=><article className="tile" key={p.id}>
           <h3>{p.title}</h3><p>{p.description}</p><p><strong>{dateLabel(p.starts_at)}</strong> – {dateLabel(p.ends_at)}</p><p>Venue: {p.venue}</p><p>Capacity: {p.capacity??"Unlimited"}</p>
