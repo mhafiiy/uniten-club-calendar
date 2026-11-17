@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 type Proposal = { id:string; club_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; status:string; submitted_by:string; capacity:number|null };
-type Notice = { id:string; proposal_id:string; event_type:string; created_at:string; read_at:string|null };
+type Notice = { id:string; proposal_id:string; event_type:string; created_at:string; read_at:string|null; event_title:string|null };
 type Change = { id:string; proposal_id:string; title:string; description:string|null; venue:string; starts_at:string; ends_at:string; capacity:number|null; status:string };
 type Club = { id:string; name:string };
 type Membership = { club_id:string };
@@ -50,7 +50,7 @@ export default function Home(){
       client.from("cmc_event_proposals").select("*").order("starts_at",{ascending:true}),
       client.from("cmc_registrations").select("proposal_id").eq("user_id",u.id),
       client.from("cmc_event_change_requests").select("*").order("created_at",{ascending:false}),
-      client.from("cmc_event_notifications").select("id,proposal_id,event_type,created_at,read_at").eq("user_id",u.id).order("created_at",{ascending:false}).limit(50)
+      client.from("cmc_event_notifications").select("id,proposal_id,event_type,created_at,read_at,event_title").eq("user_id",u.id).order("created_at",{ascending:false}).limit(50)
     ]);
     for(const result of [c,m,s,p,r,ch,nt]) if(result.error) setMessage(result.error.message);
     setClubs((c.data||[]) as Club[]);
@@ -170,7 +170,7 @@ export default function Home(){
     </form><p>New accounts start as students. Club representative and SRC access must be assigned by an authorised administrator.</p></section>:
     <>
       <div className="actions"><span>Signed in as <strong>{user.email}</strong></span><button className="secondary" onClick={()=>void client.auth.signOut()}>Sign out</button><button className="secondary" onClick={()=>void refresh(user)}>Refresh</button></div>
-      {notices.some(n=>!n.read_at)&&<section className="panel"><h2>Event updates affecting your registrations</h2><p>These are in-app notifications. Email and Google Calendar updates are not automatic yet.</p>{notices.filter(n=>!n.read_at).map(n=><div className="tile" key={n.id}><strong>{n.event_type==="event_cancelled"?"Event cancelled":"Event details changed"}</strong><p>{proposals.find(p=>p.id===n.proposal_id)?.title||"A registered event"} · {dateLabel(n.created_at)}</p><button className="secondary" onClick={()=>void acknowledge(n.id)}>Mark as read</button></div>)}</section>}
+      {notices.some(n=>!n.read_at)&&<section className="panel"><h2>Event updates affecting your registrations</h2><p>These are in-app notifications. Email and Google Calendar updates are not automatic yet.</p>{notices.filter(n=>!n.read_at).map(n=><div className="tile" key={n.id}><strong>{n.event_type==="event_cancelled"?"Event cancelled":"Event details changed"}</strong><p>{n.event_title||proposals.find(p=>p.id===n.proposal_id)?.title||"A registered event"} · {dateLabel(n.created_at)}</p><button className="secondary" onClick={()=>void acknowledge(n.id)}>Mark as read</button></div>)}</section>}
       <section className="panel"><h2>Approved events</h2>
         {approved.length===0?<p>No approved events are available yet.</p>:<div className="grid">{approved.map(p=><article className="tile" key={p.id}>
           <h3>{p.title}</h3><p>{p.description}</p><p><strong>{dateLabel(p.starts_at)}</strong> – {dateLabel(p.ends_at)}</p><p>Venue: {p.venue}</p><p>Capacity: {p.capacity??"Unlimited"}</p>
